@@ -25,9 +25,13 @@ module Creek
       # type.
       def call
         @style_types ||= begin
-          styles_xml_doc.css('styleSheet cellXfs xf').map do |xstyle|
-            a = num_fmt_id(xstyle)
-            style_type_by_num_fmt_id( a )
+          if styles_xml_doc
+            styles_xml_doc.css('styleSheet cellXfs xf').map do |xstyle|
+              a = num_fmt_id(xstyle)
+              style_type_by_num_fmt_id( a )
+            end
+          else
+            {}
           end
         end
       end
