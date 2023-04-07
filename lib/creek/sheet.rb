@@ -97,6 +97,7 @@ module Creek
           row, cells, cell = nil, {}, nil
           cell_type = nil
           cell_style_idx = nil
+          missing_cell_references = nil
           @book.files.file.open(path) do |xml|
             prefix = ''
             Nokogiri::XML::Reader.from_io(xml).each do |node|
@@ -113,6 +114,19 @@ module Creek
                 row['cells'] = {}
                 cells = {}
                 y << (include_meta_data ? row : cells) if node.self_closing?
+                missing_cell_references ||= if row.key?('r')
+                                      []
+                                    else
+                                      ["A", "1"]
+                                    end
+
+                if !row.key? 'r'
+                  raise "Expected cell references, found row without 'r'" if missing_cell_references.empty?
+                  row['r'] = missing_cell_references[1]
+                  missing_cell_references[0] = "A"
+                elsif missing_cell_references.any?
+                  raise "Expected no cell references, found row reference #{row['r']}"
+                end
               elsif node.name == "#{prefix}row" && node.node_type == closer
                 processed_cells = fill_in_empty_cells(cells, row['r'], cell, use_simple_rows_format)
                 @headers = processed_cells if with_headers && row['r'] == HEADERS_ROW_NUMBER
@@ -127,10 +141,19 @@ module Creek
 
                 row['cells'] = processed_cells
                 y << (include_meta_data ? row : processed_cells)
+                missing_cell_references[1] = missing_cell_references[1].succ if missing_cell_references.any?
               elsif node.name == "#{prefix}c" && node.node_type == opener
                 cell_type      = node.attributes['t']
                 cell_style_idx = node.attributes['s']
-                cell           = node.attributes['r']
+                cell           = if missing_cell_references.empty?
+                                   node.attributes.fetch('r')
+                                 elsif node.attributes.key? 'r'
+                                   raise "Expected no cell references, found cell reference #{node.attributes['r']}"
+                                 else
+                                   missing_cell_references.join
+                                 end
+              elsif node.name == "#{prefix}c" && node.node_type == closer
+                missing_cell_references[0] = missing_cell_references[0].succ if missing_cell_references.any?
               elsif ["#{prefix}v", "#{prefix}t"].include?(node.name) && node.node_type == opener
                 unless cell.nil?
                   node.read
