@@ -152,6 +152,10 @@ module Creek
                                  else
                                    missing_cell_references.join
                                  end
+                if node.self_closing?
+                 cells[cell] = ""
+                 missing_cell_references[0] = missing_cell_references[0].succ if missing_cell_references.any?
+                end
               elsif node.name == "#{prefix}c" && node.node_type == closer
                 missing_cell_references[0] = missing_cell_references[0].succ if missing_cell_references.any?
               elsif ["#{prefix}v", "#{prefix}t"].include?(node.name) && node.node_type == opener
